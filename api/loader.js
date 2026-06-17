@@ -21,11 +21,11 @@ export async function loadSystemPrompt() {
   ])
 
   const result = agent
-    .replace('<!-- {{context.md}} -->', context)
-    .replace('<!-- {{tools.md}} -->', tools)
+    .replace('{/* {{context.md}} */}', context)
+    .replace('{/* {{tools.md}} */}',   tools)
 
   // Guard: catch unresolved placeholders before they reach the model
-  if (result.includes('<!-- {{')) {
+  if (result.includes('{/* {{')) {
     throw new Error('loader: unresolved placeholder in system prompt')
   }
 
