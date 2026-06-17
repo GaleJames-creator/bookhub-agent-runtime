@@ -18,14 +18,6 @@ async function loadSystemPrompt() {
       throw new Error('loader: unresolved placeholder in system prompt')
     }
 
-    console.log('context replaced:', !result.includes('{/* {{context.md}} */}'))
-    console.log('tools replaced:', !result.includes('{/* {{tools.md}} */}'))
-    console.log('result length:', result.length)
-    console.log('agent length:', agent.length)
-    console.log('context length:', context.length)
-    console.log('tools length:', tools.length)
-    console.log('placeholder check:', JSON.stringify(agent.slice(agent.indexOf('{/*'), agent.indexOf('{/*') + 30)))
-
     if (result.includes('{/* {{')) {
       throw new Error('loader: unresolved placeholder in system prompt')
     }
