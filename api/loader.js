@@ -14,6 +14,10 @@ async function loadSystemPrompt() {
       .replace('{/* {{context.md}} */}', context)
       .replace('{/* {{tools.md}} */}',   tools)
 
+    console.log('context replaced:', !result.includes('{/* {{context.md}} */}'))
+    console.log('tools replaced:', !result.includes('{/* {{tools.md}} */}'))
+    console.log('result length:', result.length)
+
     if (result.includes('{/* {{')) {
       throw new Error('loader: unresolved placeholder in system prompt')
     }
