@@ -1,9 +1,7 @@
 import { loadSystemPrompt } from './loader.js'
 
-export const config = { runtime: 'edge' }
-
-export default async function handler(req) {
-  const origin = req.headers.get('origin') ?? '*'
+export default async function handler(req, res) {
+  const origin = req.headers.origin ?? '*'
 
   const corsHeaders = {
     'Access-Control-Allow-Origin': origin,
@@ -12,14 +10,18 @@ export default async function handler(req) {
   }
 
   if (req.method === 'OPTIONS') {
-    return new Response(null, { status: 204, headers: corsHeaders })
+    res.writeHead(204, corsHeaders)
+    res.end()
+    return
   }
 
   if (req.method !== 'POST') {
-    return new Response('Method not allowed', { status: 405, headers: corsHeaders })
+    res.writeHead(405, corsHeaders)
+    res.end('Method not allowed')
+    return
   }
 
-  const { messages } = await req.json()
+  const { messages } = req.body
   const systemPrompt  = await loadSystemPrompt()
 
   const upstream = await fetch('https://api.anthropic.com/v1/messages', {
@@ -40,18 +42,26 @@ export default async function handler(req) {
 
   if (!upstream.ok) {
     const err = await upstream.json()
-    return new Response(JSON.stringify(err), {
-      status: upstream.status,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    })
+    res.writeHead(upstream.status, { ...corsHeaders, 'Content-Type': 'application/json' })
+    res.end(JSON.stringify(err))
+    return
   }
 
-  return new Response(upstream.body, {
-    headers: {
-      ...corsHeaders,
-      'Content-Type':      'text/event-stream',
-      'Cache-Control':     'no-cache',
-      'X-Accel-Buffering': 'no',
-    },
+  res.writeHead(200, {
+    ...corsHeaders,
+    'Content-Type':      'text/event-stream',
+    'Cache-Control':     'no-cache',
+    'X-Accel-Buffering': 'no',
   })
+
+  const reader  = upstream.body.getReader()
+  const decoder = new TextDecoder()
+
+  while (true) {
+    const { done, value } = await reader.read()
+    if (done) break
+    res.write(decoder.decode(value, { stream: true }))
+  }
+
+  res.end()
 }
