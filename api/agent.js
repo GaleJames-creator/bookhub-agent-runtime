@@ -1,6 +1,6 @@
-import { loadSystemPrompt } from './loader.js'
+const { loadSystemPrompt } = require('./loader.js')
 
-export default async function handler(req, res) {
+module.exports = async function handler(req, res) {
   const origin = req.headers.origin ?? '*'
 
   const corsHeaders = {

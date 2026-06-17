@@ -2,7 +2,7 @@ const REPO   = 'GaleJames-creator/mintlify-docs'
 const BRANCH = 'main'
 const BASE   = `https://raw.githubusercontent.com/${REPO}/${BRANCH}/agent`
 
-export async function loadSystemPrompt() {
+async function loadSystemPrompt() {
   try {
     const [agent, context, tools] = await Promise.all([
       fetchFile('agent.md'),
@@ -35,3 +35,5 @@ async function fetchFile(filename) {
 
   return res.text()
 }
+
+module.exports = { loadSystemPrompt }
