@@ -11,8 +11,12 @@ async function loadSystemPrompt() {
     ])
 
     const result = agent
-      .replace('{/* {{context.md}} */}', context)
-      .replace('{/* {{tools.md}} */}',   tools)
+      .replace('CONTEXT_MD_PLACEHOLDER', context)
+      .replace('TOOLS_MD_PLACEHOLDER',   tools)
+
+    if (result.includes('CONTEXT_MD_PLACEHOLDER') || result.includes('TOOLS_MD_PLACEHOLDER')) {
+      throw new Error('loader: unresolved placeholder in system prompt')
+    }
 
     console.log('context replaced:', !result.includes('{/* {{context.md}} */}'))
     console.log('tools replaced:', !result.includes('{/* {{tools.md}} */}'))
