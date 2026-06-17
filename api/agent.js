@@ -2,17 +2,21 @@ import { loadSystemPrompt } from './loader.js'
 
 export const config = { runtime: 'edge' }
 
-/**
- * POST /api/agent
- * Body: { messages: [ { role, content } ] }
- *
- * Forwards conversation history to the Anthropic API with the
- * assembled system prompt. Streams the response back to the client.
- * The API key never reaches the browser.
- */
 export default async function handler(req) {
+  const origin = req.headers.get('origin') ?? '*'
+
+  const corsHeaders = {
+    'Access-Control-Allow-Origin': origin,
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type',
+  }
+
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { status: 204, headers: corsHeaders })
+  }
+
   if (req.method !== 'POST') {
-    return new Response('Method not allowed', { status: 405 })
+    return new Response('Method not allowed', { status: 405, headers: corsHeaders })
   }
 
   const { messages } = await req.json()
@@ -22,7 +26,7 @@ export default async function handler(req) {
     method:  'POST',
     headers: {
       'Content-Type':      'application/json',
-      'x-api-key':        process.env.ANTHROPIC_API_KEY,
+      'x-api-key':         process.env.ANTHROPIC_API_KEY,
       'anthropic-version': '2023-06-01',
     },
     body: JSON.stringify({
@@ -38,15 +42,15 @@ export default async function handler(req) {
     const err = await upstream.json()
     return new Response(JSON.stringify(err), {
       status: upstream.status,
-      headers: { 'Content-Type': 'application/json' },
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
   }
 
-  // Stream the Anthropic SSE response directly back to the widget
   return new Response(upstream.body, {
     headers: {
-      'Content-Type':  'text/event-stream',
-      'Cache-Control': 'no-cache',
+      ...corsHeaders,
+      'Content-Type':      'text/event-stream',
+      'Cache-Control':     'no-cache',
       'X-Accel-Buffering': 'no',
     },
   })
