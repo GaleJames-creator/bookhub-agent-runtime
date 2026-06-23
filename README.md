@@ -4,8 +4,8 @@ The proxy and loader power the BookHub Publisher API documentation assistant at 
 
 ## What's in this repo
 
-- `api/agent.js`&mdash;The Node.js serverless function, deployed on Vercel, receives `POST` requests from the chat widget, attaches the Anthropic API key, and forwards the request to the Anthropic Messages API. Streams the response back to the browser. The API key is stored as a Vercel environment variable and is only used server-side during request forwarding — it is never sent to the browser.
-- `api/loader.js`&mdash;Fetches the three agent definition files (Markdown) from the `mintlify-docs` repo and concatenates them into a single system prompt, passed to the Anthropic API as the `system` parameter, so the model reads the full agent definition before processing each user message. Both functions run only on Vercel — the `.env` file is for local development reference only and is not used by the deployed function.
+- `api/agent.js`&mdash;The Node.js serverless function on Vercel receives `POST` requests from the chat widget, attaches the Anthropic API key, and forwards the request to the Anthropic Messages API. It streams the response back to the browser. Vercel stores the API key as an environment variable and uses it only on the server during request forwarding. It is never sent to the browser.
+- `api/loader.js`&mdash;Fetches the three agent definition files (Markdown) from the `mintlify-docs` repo and concatenates them into a single system prompt on every Anthropic API request, so changes take effect immediately after pushing updates to the `main` branch&mdash;no redeployment required. The model reads the full agent definition before processing each user message. Both functions run only on Vercel&mdash;the `.env` file is for local development reference only, and the deployed function does not use it.
 
 ## How the agent works
 
@@ -13,12 +13,34 @@ The agent is a large language model (Claude) that answers questions about the Bo
 
 - `agent/agent.md`&mdash;defines the agent’s persona, scope, tone, response
 format, and behavior rules
-- `agent/context.md`&mdash;provides grounding content (facts loaded into the model before it responds, so answers draw from your documentation rather than general training data), covering authentication, rate limits, error codes, pagination, changelog, and breaking changes.
+- `agent/context.md`&mdash;provides [grounding content](#how-grounding-content-shapes-responses), covering authentication, rate limits, error codes, pagination, changelog, and breaking changes.
 - `agent/tools.md`&mdash;describes tools the agent can invoke: searching the docs, fetching a page, looking up an endpoint, and opening a support ticket
 
-At runtime, `loader.js` fetches all three files from GitHub raw URLs and concatenates them into a single `system` parameter string. `agent.js` passes this string as the `system` parameter in the Anthropic API request, meaning the model reads the full agent definition files (Markdown) before processing each user message.
+At runtime, `loader.js` fetches all three files from GitHub raw URLs and concatenates them into a single `system` parameter string. `agent.js` passes this string as the `system` parameter in the Anthropic API request, so the model reads the full agent definition files before processing each user message.
 
 The chat widget (`widget.js`) lives in mintlify-docs and is served by Mintlify on every page. It sends conversation history to `api/agent` on each turn and renders streaming responses as formatted Markdown using marked.js.
+
+## How grounding content shapes responses
+
+At runtime, `loader.js` fetches all three files and concatenates them into a single system prompt. Claude reads this system prompt before processing each user message, so every response is grounded in the current state of those files, not general training data. See [How the agent works](#how-the-agent-works) for details on the agent's behavior.
+
+This is the conversation retrieval flow:
+
+1. The user submits a query in the chat widget.
+2. `loader.js` fetches the three agent definition files from GitHub and concatenates them into the system prompt.
+3. `agent.js` sends an API request to Claude with the assembled system prompt and the full conversation history.
+4. Claude generates a response grounded in the system prompt content.
+5. The response streams back to the user via Server-Sent Events.
+
+Because the agent definition files are fetched fresh on every request, updating agent behavior requires no redeployment&mdash;push changes to the Markdown files in `mintlify-docs/agent/` and they take effect on the next request.
+
+### Why content structure affects response quality
+
+The system prompt is assembled by concatenating three files in a fixed order: `agent.md`, `context.md`, `tools.md`. Claude reads this content sequentially before generating a response. Clear headings, focused scope per file, and precise factual content in context.md produce more accurate responses than mixed or loosely structured content.
+
+If `context.md` contains contradictory facts, overlapping coverage, or content that belongs in the `agent.md`, response accuracy degrades. The same principle applies to `tools.md`&mdash;tool descriptions that are ambiguous or overlap in scope produce unpredictable tool selection behavior.
+
+Treat the agent definition files with the same discipline as any API reference: one concept per section, accurate facts, no redundancy.
 
 ## API contract
 
@@ -77,7 +99,7 @@ The client should stop reading the stream upon receiving this event.
 
 - A Vercel account connected to GitHub.
 - An Anthropic API key&mdash;obtain one at [console.anthropic.com](https://console.anthropic.com) under API Keys → Create Key.
-- A clone of [mintlify-docs](https://github.com/GaleJames-creator/mintlify-docs). The repo must be public so `loader.js` can fetch the agent definition files (Markdown).
+- A clone of [mintlify-docs](https://github.com/GaleJames-creator/mintlify-docs). The repo must be public so `loader.js` can fetch the agent definition files.
 
 ## Setup
 
@@ -95,7 +117,7 @@ Create `.env` at the repo root for local reference:
 ANTHROPIC_API_KEY=your-key-here
 ```
 
-This file is excluded from Git by the `.gitignore` file. It is not used by the deployed function — Vercel uses its own environment variable store.
+This file is excluded from Git by the `.gitignore` file. It is not used by the deployed function&mdash;Vercel uses its own environment variable store.
 
 ### 3. Deploy to Vercel
 
@@ -108,7 +130,7 @@ This file is excluded from Git by the `.gitignore` file. It is not used by the d
 
 1. In your Vercel project, go to **Settings → Environment Variables**.
 2. Add `ANTHROPIC_API_KEY` with your key as the value.
-3. Paste the key as a single unbroken string — line breaks will cause an invalid header error.
+3. Paste the key as a single unbroken string&mdash;line breaks will cause an invalid header error. 
 4. Click **Save**, then **Redeploy** to apply the change.
 
 ### 5. Confirm the function is live
@@ -135,7 +157,7 @@ const PROXY_URL = 'https://your-vercel-project.vercel.app/api/agent'
 
 **Vercel function timeout**&mdash;The Hobby plan has a 10-second function timeout. Streaming begins as soon as the Anthropic API returns the first token, so responses typically start within 1–2 seconds. Full responses to complex questions may exceed the Hobby plan's timeout.
 
-**API key rotation**&mdash;If you rotate your Anthropic API key, update the environment variable in Vercel and redeploy. The old key should be revoked immediately after the new one is confirmed to work.
+**API key rotation**&mdash;If you rotate your Anthropic API key, update the environment variable in Vercel and redeploy. Revoke the old key immediately after the new one is confirmed to work.
 
 **Anthropic API rate limits**&mdash;Rate limits depend on your Anthropic usage tier. If the agent returns a `529 Overloaded` error, the upstream Anthropic API is rate-limiting your key. Check your tier at [console.anthropic.com](https://console.anthropic.com).
 
@@ -147,13 +169,13 @@ Edit the Markdown files in `mintlify-docs/agent/`&mdash;no changes to this repo 
 
 ## Glossary
 
-**Grounding content**&mdash;Specific facts are loaded into the model's context before it responds. Grounding ensures the agent answers from your documentation rather than its general training data.
+**Agent definition files**&mdash;The three Markdown files (`agent.md`, `context.md`, and `tools.md`) in `mintlify-docs/agent/` that define the agent's behavior, grounding content, and tools. See [How grounding content shapes responses](#how-grounding-content-shapes-responses).
 
-**System prompt**&mdash;The instructions passed to the model before the conversation begins. In this project, the system prompt is assembled by `loader.js` from the three agent definition files and passed as a `system` parameter in the Anthropic API request.
-
-**Agent definition files**&mdash;The three Markdown files in `mintlify-docs/agent/` (`agent.md`, `context.md`, `tools.md`) that define the agent's behavior, grounding content, and tools.
+**Grounding content**&mdash;The runtime role of the agent definition files&mdash;facts loaded into the model before it responds, so answers draw from your documentation rather than general training data.
 
 **Server-Sent Events (SSE)**&mdash;A streaming protocol used to send the model's response token by token as it is generated, rather than waiting for the full response before returning it to the browser.
+
+**System prompt**&mdash;The instructions passed to the model before the conversation begins. In this project, the system prompt is assembled by `loader.js` from the three agent definition files and passed as a `system` parameter in the Anthropic API request.
 
 ## Related
 
