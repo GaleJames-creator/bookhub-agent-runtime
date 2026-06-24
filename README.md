@@ -36,7 +36,7 @@ Because the agent definition files are fetched fresh on every request, updating 
 
 ### Why content structure affects response quality
 
-The system prompt is assembled by concatenating three files in a fixed order: `agent.md`, `context.md`, `tools.md`. Claude reads this content sequentially before generating a response. Clear headings, focused scope per file, and precise factual content in context.md produce more accurate responses than mixed or loosely structured content.
+The system prompt is assembled by concatenating three files in a fixed order: `agent.md`, `context.md`, `tools.md`. Claude reads this content sequentially before generating a response. Clear headings, focused scope per file, and precise factual content in `context.md` produce more accurate responses than mixed or loosely structured content.
 
 If `context.md` contains contradictory facts, overlapping coverage, or content that belongs in the `agent.md`, response accuracy degrades. The same principle applies to `tools.md`&mdash;tool descriptions that are ambiguous or overlap in scope produce unpredictable tool selection behavior.
 
@@ -50,8 +50,8 @@ Treat the agent definition files with the same discipline as any API reference: 
 
 **Header**
 
-| Header | Value |
-|--------|-------|
+| Header         | Value              |
+|----------------|--------------------|
 | `Content-Type` | `application/json` |
 
 **Body**
@@ -130,7 +130,7 @@ This file is excluded from Git by the `.gitignore` file. It is not used by the d
 
 1. In your Vercel project, go to **Settings → Environment Variables**.
 2. Add `ANTHROPIC_API_KEY` with your key as the value.
-3. Paste the key as a single unbroken string&mdash;line breaks will cause an invalid header error. 
+3. Paste the key as a single unbroken string&mdash;line breaks will cause an invalid header error.
 4. Click **Save**, then **Redeploy** to apply the change.
 
 ### 5. Confirm the function is live
